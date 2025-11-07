@@ -15,10 +15,6 @@ https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_C
 sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-# optional: install Docker Desktop (only if you need GUI features)
-# cd ~/Downloads
-# sudo apt-get install ./docker-desktop-amd64.deb
-
 # install MySQL client
 sudo apt-get install -y mysql-client-core-8.0
 
@@ -30,5 +26,10 @@ mkdir -p server/include/lib
 if [ ! -f server/include/lib/httplib.h ]; then
     wget https://raw.githubusercontent.com/yhirose/cpp-httplib/master/httplib.h -O server/include/lib/httplib.h
 fi
+
+mkdir -p mysql-docker/dbdata
+sudo docker compose -f mysql-docker/docker-compose.yml up -d
+# Connect manually to MySQL (optional)
+# mysql -h 127.0.0.1 -uroot -p
 
 echo "✅ Setup complete."
