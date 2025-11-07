@@ -4,19 +4,28 @@
 
 A end-to-end **Key-Value Store** system built for **CS744: Design and Engineering of Computing Systems (Phase 1)**. The system provides a concurrent HTTP-based key-value interface with:
 
-* **MySQL persistence layer** (via Docker)
-* **In-memory LRU cache** for fast reads
-* **Thread pool** for concurrent request handling
-* **Client load generator** for benchmarking performance
+* **Persistent Database** (MySQL Server via Docker): Thread-safe MySQL connector for persistence. Each query opens a new connection to ensure thread safety.
+* **Server** with:
+    * **In-memory LRU cache** for fast reads
+    * **Thread pool** for concurrent request handling
+* **Load Generator** for simulating multiple clients with multiple threads for benchmarking performance and identifying bottlenecks.
 
----
+## Architecture
 
-## ⚙️ Setup
+```
++--------------+        HTTP        +--------------+        SQL        +-------------+
+|  kv_client   |  <-------------->  |  kv_server   |  <-------------->  |  MySQL DB   |
+| (Load Gen)   |                    | (LRU Cache)  |                    | (Docker)    |
++--------------+                    +--------------+                    +-------------+
+```
+
+
+## Setup
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-username>/CS744-Project.git
+git clone https://github.com/BhagawanPanditi/CS744-Project.git
 cd CS744-Project
 ```
 
@@ -106,21 +115,6 @@ You will get two executables:
 | `get_all`        | Uniform reads from all keys            |
 | `get_popular`    | Reads from a small set of popular keys |
 | `get_mix`        | Mixed workload (PUT/GET/DELETE)        |
-
----
-
-## 🧩 Architecture Overview
-
-```
-+--------------+        HTTP        +--------------+        SQL        +-------------+
-|  kv_client   |  <-------------->  |  kv_server   |  <-------------->  |  MySQL DB   |
-| (Load Gen)   |                    | (LRU Cache)  |                    | (Docker)    |
-+--------------+                    +--------------+                    +-------------+
-```
-
-* **Cache:** In-memory LRU cache (reduces DB hits)
-* **ThreadPool:** Manages parallel request execution
-* **DB Layer:** Thread-safe MySQL connector for persistence. Each query opens a new MySQL connection to ensure thread safety
 
 ---
 
