@@ -3,7 +3,7 @@
 #include <string>
 #include <cstring>
 #include <cstdlib>
-#include "db.cpp"
+#include "db.hpp"
 #include "cache.hpp"
 #include "thread_pool.hpp"
 

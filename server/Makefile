@@ -16,11 +16,6 @@ BIN       := kv_server
 SRCS      := $(wildcard $(SRC_DIR)/*.cpp)
 OBJS      := $(SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
-# ---------- Default Configuration ----------
-PORT        ?= 8080
-CACHE_SIZE  ?= 1000
-THREADS     ?= 8
-
 # ---------- Default Target ----------
 all: $(BIN)
 
@@ -39,14 +34,9 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
 $(OBJ_DIR):
 	@mkdir -p $(OBJ_DIR)
 
-# ---------- Run ----------
-run: all
-	@echo "🚀 Running server on port $(PORT) with cache=$(CACHE_SIZE) and threads=$(THREADS)..."
-	./$(BIN) --port $(PORT) --cache $(CACHE_SIZE) --threads $(THREADS)
-
 # ---------- Clean ----------
 clean:
 	@echo "🧹 Cleaning build files..."
 	rm -rf $(OBJ_DIR) $(BIN)
 
-.PHONY: all clean run
+.PHONY: all clean
