@@ -1,0 +1,7 @@
+dbdata/
+*.o
+*.out
+*.log
+*.deb
+*.DS_Store
+mysql-docker/dbdata/
