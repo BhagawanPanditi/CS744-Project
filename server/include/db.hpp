@@ -34,7 +34,7 @@ public:
             driver = get_driver_instance();
 
             // One-time initialization (create DB + table)
-            std::lock_guard<std::mutex> lock(init_mtx);
+            // std::lock_guard<std::mutex> lock(init_mtx);
             auto con = std::unique_ptr<sql::Connection>(driver->connect(host, user, pass));
             {
                 std::unique_ptr<sql::Statement> stmt(con->createStatement());
@@ -64,7 +64,7 @@ public:
             pstmt->setString(1, key);
             pstmt->setString(2, value);
             pstmt->execute();
-            std::cout << "✅ Inserted (" << key << ")\n";
+            // std::cout << "✅ Inserted (" << key << ")\n";
         } catch (sql::SQLException &e) {
             std::cerr << "❌ Insert failed: " << e.what() << std::endl;
         }
@@ -95,7 +95,7 @@ public:
             );
             pstmt->setString(1, key);
             pstmt->execute();
-            std::cout << "🗑️  Deleted key: " << key << std::endl;
+            // std::cout << "🗑️  Deleted key: " << key << std::endl;
         } catch (sql::SQLException &e) {
             std::cerr << "❌ Delete failed: " << e.what() << std::endl;
         }

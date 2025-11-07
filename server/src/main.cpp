@@ -13,22 +13,16 @@ int main(int argc, char** argv) {
     size_t cache_size = 1000;
     size_t pool_threads = 8;
 
-    for (int i = 1; i < argc; ++i) {
-        if (!strcmp(argv[i], "--port") && i + 1 < argc) {
-            port = std::atoi(argv[++i]);
-        } else if (!strcmp(argv[i], "--cache") && i + 1 < argc) {
-            cache_size = std::stoul(argv[++i]);
-        } else if (!strcmp(argv[i], "--threads") && i + 1 < argc) {
-            pool_threads = std::stoul(argv[++i]);
-        } else if (!strcmp(argv[i], "--help")) {
-            std::cout << "Usage: ./server [--port <num>] [--cache <entries>] [--threads <num>]\n";
-            return 0;
-        } else {
-            std::cerr << "Unknown argument: " << argv[i] << "\n";
-            std::cerr << "Use --help for usage info.\n";
-            return 1;
-        }
+    if (argc < 4) {
+        std::cout << "Usage: ./kv_server <port> <cache_entries> <threads>\n";
+        std::cout << "Example: ./kv_server 8080 1000 8\n";
+        return 0;
     }
+
+    int port = std::atoi(argv[1]);
+    size_t cache_size = std::stoul(argv[2]);
+    size_t pool_threads = std::stoul(argv[3]);
+
 
     std::cout << "Starting Product Catalog KV Server\n";
     std::cout << "-----------------------------------\n";
@@ -114,3 +108,5 @@ int main(int argc, char** argv) {
     std::cout << "✅ Server ready on http://0.0.0.0:" << port << "\n";
     svr.listen("0.0.0.0", port);
 }
+
+// ./kv_server 8080 1000 8

@@ -186,7 +186,7 @@ void print_summary(const Config &cfg, double duration_s) {
 
 int main(int argc, char** argv) {
     if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <workload_type> <load_level>\n";
+        std::cerr << "Usage: " << argv[0] << " <workload_type> <load_level> <duration in sec>\n";
         std::cerr << "  workload_type: put_all_create | put_all_delete | get_all | get_popular | get_mix\n";
         std::cerr << "  load_level: number of threads (e.g., 4, 8, 16)\n";
         return 1;
@@ -195,6 +195,7 @@ int main(int argc, char** argv) {
     Config cfg;
     cfg.workload = argv[1];
     cfg.threads = std::stoul(argv[2]);
+    cfg.duration_s = std::stoul(argv[3]);
 
     std::cout << "Starting load generator...\n";
     std::cout << "Server: " << cfg.host << ":" << cfg.port << "\n";
@@ -202,8 +203,8 @@ int main(int argc, char** argv) {
     std::cout << "Threads: " << cfg.threads << "\n";
     std::cout << "Duration: " << cfg.duration_s << " seconds\n\n";
 
-    if (cfg.workload == "get_all" || cfg.workload == "get_popular")
-        populate_keys(cfg);
+    // if (cfg.workload == "get_all" || cfg.workload == "get_popular")
+    //     populate_keys(cfg);
 
     auto start = steady_clock::now();
     auto end_time = start + seconds(cfg.duration_s);
