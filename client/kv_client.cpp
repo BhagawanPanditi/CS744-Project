@@ -1,14 +1,15 @@
 // kv_client.cpp
 // Usage:
-//   ./kv_client <workload_type> <load_level>
+//   ./kv_client <workload_type> <load_level> <duration in sec>
 // Example:
-//   ./kv_client put_all_create 32
-//   ./kv_client put_all_delete 32
-//   ./kv_client get_all 64
-//   ./kv_client get_popular 16
-//   ./kv_client get_mix 32
+//   ./kv_client put_all_create 32 60
+//   ./kv_client put_all_delete 32 60
+//   ./kv_client get_all 64 60
+//   ./kv_client get_popular 16 60
+//   ./kv_client get_mix 32 60
 //
 // workload_type = put_all_create | put_all_delete | get_all | get_popular | get_mix
+// Note: Ensure to run `put_all_create` first to populate keys before running reads/deletes.
 
 #include "lib/httplib.h"
 #include <atomic>
@@ -29,7 +30,7 @@ struct Config {
     size_t duration_s = 30;
     std::string workload = "get_all";
     size_t key_space = 10000;
-    size_t popular_size = 20;
+    size_t popular_size = 100;
 };
 
 static std::atomic<uint64_t> successful_requests{0};
@@ -112,9 +113,10 @@ void worker_get_popular(const Config &cfg, size_t tid, steady_clock::time_point 
     cli.set_connection_timeout(5, 0);
     cli.set_read_timeout(5, 0);
     std::mt19937 rng(std::random_device{}() ^ (tid << 16));
-    std::uniform_int_distribution<size_t> pop_dist(0, cfg.popular_size - 1);
+    // Pick keys randomly from the first 1000 keys (key_0 to key_999)
+    std::uniform_int_distribution<size_t> pop_dist(0, 999);
     while (steady_clock::now() < end_time) {
-        std::string key = "popular_" + std::to_string(pop_dist(rng));
+        std::string key = "key_" + std::to_string(pop_dist(rng));
         do_read(cli, key);
     }
 }
@@ -141,30 +143,6 @@ void worker_get_mix(const Config &cfg, size_t tid, steady_clock::time_point end_
             do_delete(cli, key);
         }
     }
-}
-
-void populate_keys(const Config &cfg) {
-    httplib::Client cli(cfg.host.c_str(), cfg.port);
-    cli.set_connection_timeout(5, 0);
-    if (cfg.workload == "get_all") {
-        std::cout << "Populating " << cfg.key_space << " keys...\n";
-        for (size_t i = 0; i < cfg.key_space; ++i) {
-            std::string key = "key_" + std::to_string(i);
-            std::string value = "value_" + std::to_string(i);
-            std::string body = "key=" + key + "&value=" + value;
-            cli.Post("/create", body, "application/x-www-form-urlencoded");
-            if (i % 2000 == 0) std::cout << "  inserted " << i << "\n";
-        }
-    } else if (cfg.workload == "get_popular") {
-        std::cout << "Populating " << cfg.popular_size << " popular keys...\n";
-        for (size_t i = 0; i < cfg.popular_size; ++i) {
-            std::string key = "popular_" + std::to_string(i);
-            std::string value = "value_" + std::to_string(i);
-            std::string body = "key=" + key + "&value=" + value;
-            cli.Post("/create", body, "application/x-www-form-urlencoded");
-        }
-    }
-    std::cout << "Prepopulation complete.\n\n";
 }
 
 void print_summary(const Config &cfg, double duration_s) {
@@ -202,9 +180,6 @@ int main(int argc, char** argv) {
     std::cout << "Workload: " << cfg.workload << "\n";
     std::cout << "Threads: " << cfg.threads << "\n";
     std::cout << "Duration: " << cfg.duration_s << " seconds\n\n";
-
-    // if (cfg.workload == "get_all" || cfg.workload == "get_popular")
-    //     populate_keys(cfg);
 
     auto start = steady_clock::now();
     auto end_time = start + seconds(cfg.duration_s);

@@ -1,3 +1,5 @@
+// ./kv_server 8080 1000 8
+
 #include "lib/httplib.h"
 #include <iostream>
 #include <string>
@@ -19,9 +21,10 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    int port = std::atoi(argv[1]);
-    size_t cache_size = std::stoul(argv[2]);
-    size_t pool_threads = std::stoul(argv[3]);
+    port = std::atoi(argv[1]);
+    cache_size = std::stoul(argv[2]);
+    pool_threads = std::stoul(argv[3]);
+
 
 
     std::cout << "Starting Product Catalog KV Server\n";
@@ -109,4 +112,3 @@ int main(int argc, char** argv) {
     svr.listen("0.0.0.0", port);
 }
 
-// ./kv_server 8080 1000 8
