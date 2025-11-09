@@ -1,4 +1,4 @@
-# CS744 Key-Value Store (Phase 1)
+# CS744 Project:HTTP-based KV Server (Phase 1)
 
 ## Overview
 
