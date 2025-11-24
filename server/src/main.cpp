@@ -1,17 +1,21 @@
-// ./kv_server 8080 1000 8
+// ./kv_server <port> <cache_entries> <threads>
 
 #include "lib/httplib.h"
 #include <iostream>
 #include <string>
-#include <cstring>
 #include <cstdlib>
 #include "db.hpp"
 #include "cache.hpp"
 #include "thread_pool.hpp"
 
+// Helper for GET /read
+std::string db_get(DB &db, const std::string &key) {
+    return db.get(key);
+}
+
 int main(int argc, char** argv) {
 
-    int port = 8080;
+    int port = 9000;
     size_t cache_size = 1000;
     size_t pool_threads = 8;
 
@@ -25,8 +29,6 @@ int main(int argc, char** argv) {
     cache_size = std::stoul(argv[2]);
     pool_threads = std::stoul(argv[3]);
 
-
-
     std::cout << "Starting Product Catalog KV Server\n";
     std::cout << "-----------------------------------\n";
     std::cout << "Port:          " << port << "\n";
@@ -34,13 +36,16 @@ int main(int argc, char** argv) {
     std::cout << "Thread pool:   " << pool_threads << "\n";
     std::cout << "-----------------------------------\n";
 
-    // Initialize backend components
+    // Initialize backend
     DB db("tcp://127.0.0.1:3306", "root", "password", "shopping_catalog");
     Cache cache(cache_size);
     ThreadPool pool(pool_threads);
     httplib::Server svr;
 
+    // ---------------------- POST /create ----------------------
     svr.Post("/create", [&](const httplib::Request& req, httplib::Response& res) {
+        std::cout << "[DEBUG] /create called\n";
+
         if (!(req.has_param("key") && req.has_param("value"))) {
             res.status = 400;
             res.set_content("Missing key/value\n", "text/plain");
@@ -50,16 +55,17 @@ int main(int argc, char** argv) {
         auto key = req.get_param_value("key");
         auto value = req.get_param_value("value");
 
-        auto future = pool.enqueue([&db, &cache, key, value]() {
+        // Enqueue void task
+        pool.enqueue([&db, &cache, key, value]() {
+            std::cout << "[DEBUG] Inserting key=" << key << "\n";
             db.insert(key, value);
             cache.put(key, value);
         });
-        future.get();
 
         res.set_content("Inserted (" + key + ")\n", "text/plain");
     });
 
-    // GET /read — read operation (cache first, DB fallback)
+    // ---------------------- GET /read ----------------------
     svr.Get("/read", [&](const httplib::Request& req, httplib::Response& res) {
         if (!req.has_param("key")) {
             res.status = 400;
@@ -75,9 +81,8 @@ int main(int argc, char** argv) {
             return;
         }
 
-        auto future = pool.enqueue([&db, key]() {
-            return db.get(key);
-        });
+        // Enqueue DB read with future
+        auto future = pool.enqueue(db_get, std::ref(db), key);
         value = future.get();
 
         if (value.empty()) {
@@ -89,7 +94,7 @@ int main(int argc, char** argv) {
         }
     });
 
-    // DELETE /delete — remove key from DB and cache
+    // ---------------------- DELETE /delete ----------------------
     svr.Delete("/delete", [&](const httplib::Request& req, httplib::Response& res) {
         if (!req.has_param("key")) {
             res.status = 400;
@@ -99,16 +104,18 @@ int main(int argc, char** argv) {
 
         auto key = req.get_param_value("key");
 
-        auto future = pool.enqueue([&db, &cache, key]() {
+        pool.enqueue([&db, &cache, key]() {
+            std::cout << "[DEBUG] Deleting key=" << key << "\n";
             db.remove(key);
             cache.remove(key);
         });
-        future.get();
 
         res.set_content("Deleted " + key + "\n", "text/plain");
     });
 
     std::cout << "✅ Server ready on http://0.0.0.0:" << port << "\n";
-    svr.listen("0.0.0.0", port);
+    if (!svr.listen("0.0.0.0", port)) {
+        std::cerr << "❌ Server failed to bind to port " << port << std::endl;
+        return 1;
+    }
 }
-

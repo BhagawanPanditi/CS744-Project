@@ -8,47 +8,86 @@
 #include <string>
 #include <iostream>
 #include <mutex>
+#include <queue>
+#include <condition_variable>
 
-// Thread-safe MySQL wrapper for key-value operations
-class DB {
+// ---------------------------
+// Connection Pool
+// ---------------------------
+class ConnectionPool {
 private:
     sql::Driver* driver;
     std::string host, user, pass, dbname;
-    std::mutex init_mtx;  // protect DB initialization
-
-    // helper to create a new connection for each query
-    std::unique_ptr<sql::Connection> new_conn() {
-        auto c = std::unique_ptr<sql::Connection>(driver->connect(host, user, pass));
-        c->setSchema(dbname);
-        return c;
-    }
+    std::queue<std::unique_ptr<sql::Connection>> pool;
+    std::mutex mtx;
+    std::condition_variable cv;
+    size_t max_size;
 
 public:
-    DB(const std::string& host_,
-       const std::string& user_,
-       const std::string& pass_,
-       const std::string& dbname_)
-       : host(host_), user(user_), pass(pass_), dbname(dbname_) 
+    ConnectionPool(sql::Driver* drv, const std::string& h, const std::string& u,
+                   const std::string& p, const std::string& db, size_t size)
+        : driver(drv), host(h), user(u), pass(p), dbname(db), max_size(size)
+    {
+        for (size_t i = 0; i < max_size; ++i) {
+            auto con = std::unique_ptr<sql::Connection>(driver->connect(host, user, pass));
+            con->setSchema(dbname);
+            pool.push(std::move(con));
+        }
+    }
+
+    std::unique_ptr<sql::Connection> acquire() {
+        std::unique_lock<std::mutex> lock(mtx);
+        cv.wait(lock, [this] { return !pool.empty(); });
+        auto con = std::move(pool.front());
+        pool.pop();
+        return con;
+    }
+
+    void release(std::unique_ptr<sql::Connection> con) {
+        std::lock_guard<std::mutex> lock(mtx);
+        pool.push(std::move(con));
+        cv.notify_one();
+    }
+};
+
+// ---------------------------
+// Thread-safe MySQL KV Wrapper
+// ---------------------------
+class DB {
+private:
+    sql::Driver* driver;
+    std::unique_ptr<ConnectionPool> pool;
+
+public:
+    DB(const std::string& host,
+       const std::string& user,
+       const std::string& pass,
+       const std::string& dbname,
+       size_t pool_size = 10)
     {
         try {
             driver = get_driver_instance();
 
-            // One-time initialization (create DB + table)
-            // std::lock_guard<std::mutex> lock(init_mtx);
+            // Initial connection for DB + table setup
             auto con = std::unique_ptr<sql::Connection>(driver->connect(host, user, pass));
             {
                 std::unique_ptr<sql::Statement> stmt(con->createStatement());
                 stmt->execute("CREATE DATABASE IF NOT EXISTS `" + dbname + "`");
             }
             con->setSchema(dbname);
-            std::unique_ptr<sql::Statement> stmt(con->createStatement());
-            stmt->execute(
-                "CREATE TABLE IF NOT EXISTS kv_store ("
-                "k VARCHAR(255) PRIMARY KEY, "
-                "v TEXT)"
-            );
+            {
+                std::unique_ptr<sql::Statement> stmt(con->createStatement());
+                stmt->execute(
+                    "CREATE TABLE IF NOT EXISTS kv_store ("
+                    "k VARCHAR(255) PRIMARY KEY, "
+                    "v TEXT)"
+                );
+            }
 
             std::cout << "✅ Connected to MySQL and ready: " << dbname << std::endl;
+
+            // Initialize connection pool
+            pool = std::make_unique<ConnectionPool>(driver, host, user, pass, dbname, pool_size);
         } catch (sql::SQLException &e) {
             std::cerr << "❌ DB initialization failed: " << e.what() << std::endl;
             exit(1);
@@ -56,48 +95,50 @@ public:
     }
 
     void insert(const std::string& key, const std::string& value) {
+        auto con = pool->acquire();
         try {
-            auto con = new_conn();
-            std::unique_ptr<sql::PreparedStatement> pstmt(
+            auto pstmt = std::unique_ptr<sql::PreparedStatement>(
                 con->prepareStatement("REPLACE INTO kv_store (k, v) VALUES (?, ?)")
             );
             pstmt->setString(1, key);
             pstmt->setString(2, value);
             pstmt->execute();
-            // std::cout << "✅ Inserted (" << key << ")\n";
         } catch (sql::SQLException &e) {
             std::cerr << "❌ Insert failed: " << e.what() << std::endl;
         }
+        pool->release(std::move(con));
     }
 
     std::string get(const std::string& key) {
+        auto con = pool->acquire();
+        std::string result;
         try {
-            auto con = new_conn();
-            std::unique_ptr<sql::PreparedStatement> pstmt(
+            auto pstmt = std::unique_ptr<sql::PreparedStatement>(
                 con->prepareStatement("SELECT v FROM kv_store WHERE k = ?")
             );
             pstmt->setString(1, key);
-            std::unique_ptr<sql::ResultSet> res(pstmt->executeQuery());
+            auto res = std::unique_ptr<sql::ResultSet>(pstmt->executeQuery());
             if (res->next()) {
-                return res->getString("v");
+                result = res->getString("v");
             }
         } catch (sql::SQLException &e) {
             std::cerr << "❌ Read failed: " << e.what() << std::endl;
         }
-        return "";
+        pool->release(std::move(con));
+        return result;
     }
 
     void remove(const std::string& key) {
+        auto con = pool->acquire();
         try {
-            auto con = new_conn();
-            std::unique_ptr<sql::PreparedStatement> pstmt(
+            auto pstmt = std::unique_ptr<sql::PreparedStatement>(
                 con->prepareStatement("DELETE FROM kv_store WHERE k = ?")
             );
             pstmt->setString(1, key);
             pstmt->execute();
-            // std::cout << "🗑️  Deleted key: " << key << std::endl;
         } catch (sql::SQLException &e) {
             std::cerr << "❌ Delete failed: " << e.what() << std::endl;
         }
+        pool->release(std::move(con));
     }
 };

@@ -1,0 +1,16 @@
+Starting load generator...
+Server: localhost:9000
+Workload: put_all_create
+Threads: 16
+Duration: 300 seconds
+
+
+========== RESULTS ==========
+Workload: put_all_create
+Threads: 16
+Duration: 300.144 s
+Total Requests: 28387
+Successful: 28387
+Throughput: 94.5781 req/s
+Avg Latency: 169.107 ms
+=============================

@@ -1,0 +1,16 @@
+Starting load generator...
+Server: localhost:9000
+Workload: get_popular
+Threads: 16
+Duration: 300 seconds
+
+
+========== RESULTS ==========
+Workload: get_popular
+Threads: 16
+Duration: 300.002 s
+Total Requests: 1621921
+Successful: 1621921
+Throughput: 5406.37 req/s
+Avg Latency: 2.95477 ms
+=============================

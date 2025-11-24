@@ -1,0 +1,7 @@
+Starting Product Catalog KV Server
+-----------------------------------
+Port:          9000
+Cache entries: 1000
+Thread pool:   8
+-----------------------------------
+✅ Connected to MySQL and ready: shopping_catalog

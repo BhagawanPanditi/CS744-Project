@@ -25,12 +25,12 @@ using namespace std::chrono;
 
 struct Config {
     std::string host = "localhost";
-    int port = 8080;
+    int port = 9000;
     size_t threads = 4;
     size_t duration_s = 30;
     std::string workload = "get_all";
-    size_t key_space = 10000;
-    size_t popular_size = 100;
+    size_t key_space = 1000000;
+    size_t popular_size = 1000;
 };
 
 static std::atomic<uint64_t> successful_requests{0};
@@ -47,6 +47,7 @@ void do_create(httplib::Client &cli, const std::string &key, const std::string &
     total_latency_ns.fetch_add(duration_cast<nanoseconds>(t1 - t0).count(), std::memory_order_relaxed);
     if (res && res->status >= 200 && res->status < 300)
         successful_requests.fetch_add(1, std::memory_order_relaxed);
+
 }
 
 void do_read(httplib::Client &cli, const std::string &key) {
